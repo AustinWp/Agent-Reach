@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-reach"
+version = "1.1.0"
+description = "Give your AI Agent eyes to see the entire internet. Search + Read 10+ platforms."
+readme = "USAGE.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{ name = "Neo Reid" }]
+keywords = ["agent-infrastructure", "ai-agent", "llm-tools", "mcp", "search", "web-reader"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "feedparser>=6.0",
+    "loguru>=0.7",
+    "python-dotenv>=1.0",
+    "pyyaml>=6.0",
+    "requests>=2.28",
+    "rich>=13.0",
+    "yt-dlp>=2024.0",
+]
+
+[project.optional-dependencies]
+all = [
+    "browser-cookie3>=0.19",
+    "mcp[cli]>=1.0",
+    "playwright>=1.40",
+]
+browser = ["playwright>=1.40"]
+cookies = ["browser-cookie3>=0.19"]
+
+[project.urls]
+Homepage = "https://github.com/AustinWp/Agent-Reach"
+Repository = "https://github.com/AustinWp/Agent-Reach"
+Issues = "https://github.com/AustinWp/Agent-Reach/issues"
+
+[project.scripts]
+agent-reach = "agent_reach.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["agent_reach*"]
+
+[tool.setuptools.package-data]
+agent_reach = ["**/*.md"]
