@@ -201,18 +201,36 @@ sleep $((RANDOM % 2 + 1))
 sleep $((RANDOM % 2 + 2))
 ```
 
+### Default time filter — 1 year
+
+**When doing XHS research/调研, only include posts from the last 12 months by default.** Discard posts older than 1 year during data collection (based on `noteCard.time` from search results or `data.note.time` from detail).
+
+- Calculate cutoff: `cutoff_ms = int((time.time() - 365 * 86400) * 1000)`
+- Filter at search result stage: skip any feed where `noteCard.time < cutoff_ms`
+- If the user explicitly asks for a longer time range (e.g., "近两年", "all time", "不限时间"), respect their request
+- In the report's "数据概览" section, note the time filter applied (e.g., "时间范围：近 1 年")
+
 ### Optimal workflow — batch read after each search
 
 Search once, then read ALL results from that search before the next search. xsec_token lasts ~5-10 minutes — enough to read 15-20 posts sequentially with 1-2s delays.
 
 ```
-search → sleep 1s → read detail 1 → sleep 1s → read detail 2 → ... → read detail N → sleep 2s → next search
+search → filter by time (default 1 year) → sleep 1s → read detail 1 → sleep 1s → read detail 2 → ... → read detail N → sleep 2s → next search
 ```
 
 For bulk collection (10+ posts), use a Python batch script instead of individual CLI calls:
 
 ```python
 import subprocess, json, time, random
+
+# Default: only posts from the last 12 months
+CUTOFF_MS = int((time.time() - 365 * 86400) * 1000)
+
+def is_recent(feed):
+    """Check if a post is within the time filter."""
+    t = feed.get("noteCard", {}).get("time", 0)
+    return t >= CUTOFF_MS
+
 def read_post(feed_id, token):
     time.sleep(random.uniform(1, 2))
     r = subprocess.run(
@@ -221,6 +239,13 @@ def read_post(feed_id, token):
         capture_output=True, text=True, timeout=15)
     return json.loads(r.stdout) if r.stdout.strip() else None
 ```
+
+### Must-collect fields for reports
+
+When collecting post data, **always extract and store** these fields for report generation:
+- `id` — used to construct the original post link: `https://www.xiaohongshu.com/explore/{id}`
+- `time` — millisecond timestamp, convert to `YYYY-MM-DD` for the report
+- Both fields are available in `search_feeds` response (`feeds[].id`, `feeds[].noteCard.time`) and `get_feed_detail` response (`data.note.time`)
 
 ### xsec_token handling
 
@@ -410,6 +435,7 @@ When collecting data for research reports, **always download images locally** to
 - For Twitter cookies, recommend the user install [Cookie-Editor](https://chromewebstore.google.com/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm) Chrome extension
 - Reddit and Bilibili block server IPs — suggest a residential proxy (~$1/month) if on a server
 - If a channel breaks, run `agent-reach doctor` to diagnose
+
 AGENT_REACH_EOF
 
   log "agent-reach skill → $SKILL_DIR/SKILL.md"
@@ -498,16 +524,24 @@ description: >
 ## 三、正向舆情
 
 每条帖子格式：
-- **加粗标题** — 赞数 / 评论数 / 转发数 / 收藏数
+- **[加粗标题](原贴链接)** — 赞数 / 评论数 / 转发数 / 收藏数 · YYYY-MM-DD
 - > 作者 · IP属地
 - > 引用原文关键内容
 - 图片用 `<img src="./images/img-001.jpg" width="150" />` 引用本地图片，多图空格分隔
+
+链接格式按平台：
+- 小红书：`https://www.xiaohongshu.com/explore/{note_id}`
+- 微博：`https://weibo.com/{uid}/{mid}`
+- Twitter：`https://x.com/{username}/status/{tweet_id}`
+- 其他平台：使用原始 URL
+
+日期格式：从帖子的 `time` 字段（毫秒时间戳）转换为 `YYYY-MM-DD`
 
 ---
 
 ## 四、负向舆情
 
-同上格式，额外标注核心槽点
+同上格式（含原贴链接和日期），额外标注核心槽点
 
 ---
 
@@ -571,6 +605,7 @@ git -C "$REPO_DIR" push
 - 报告文件夹直接放在仓库根目录，文件夹名与本地一致
 - commit message 格式：`docs: 新增 {文件夹名}`（新增）或 `docs: 更新 {文件夹名}`（覆盖更新）
 - 上传完成后告知用户 GitLab 仓库链接
+
 REPORT_SKILL_EOF
 
   log "user-research-report skill → $SKILL_DIR/SKILL.md"
