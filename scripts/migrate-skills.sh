@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ============================================================
-# Agent Reach — 一键迁移 Skills + CLAUDE.md
+# Agent Reach — 一键迁移 (代码 + Skills)
 # 日期: 2026-02-28
-# 用途: 在新设备/云主机上运行，覆盖安装最新 skill 配置
+# 用途: 在新设备/云主机上运行，同步最新代码并覆盖安装 skill
 # 使用: bash migrate-skills.sh
 # ============================================================
 set -euo pipefail
@@ -13,6 +13,50 @@ NC='\033[0m'
 
 log()  { echo -e "${GREEN}[✓]${NC} $1"; }
 warn() { echo -e "${YELLOW}[!]${NC} $1"; }
+
+# pip 兼容：优先用项目 venv，其次 python3 -m pip
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+if [ -f "$PROJECT_DIR/.venv/bin/pip" ]; then
+  PIP="$PROJECT_DIR/.venv/bin/pip"
+elif command -v pip3 &>/dev/null; then
+  PIP="pip3"
+else
+  PIP="python3 -m pip"
+fi
+
+# --------------------------------------------------
+# 0. 更新 agent-reach 代码仓库 + 重装 Python 包
+# --------------------------------------------------
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+if [ -d "$REPO_DIR/.git" ]; then
+  echo ""
+  echo ">>> 更新代码仓库: $REPO_DIR"
+  git -C "$REPO_DIR" fetch --all 2>/dev/null
+
+  CURRENT=$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null)
+  if [ "$CURRENT" = "refactor-v1.1" ]; then
+    git -C "$REPO_DIR" pull --rebase 2>/dev/null && log "代码已更新 (refactor-v1.1)"
+  else
+    warn "当前分支: $CURRENT — 切换到 refactor-v1.1"
+    git -C "$REPO_DIR" checkout refactor-v1.1 2>/dev/null
+    git -C "$REPO_DIR" pull --rebase 2>/dev/null && log "已切换并更新到 refactor-v1.1"
+  fi
+
+  echo ""
+  echo ">>> 重新安装 Python 包 (editable mode)"
+  if $PIP install -e "$REPO_DIR" 2>&1 | tail -5; then
+    log "agent-reach Python 包已更新 ($(agent-reach version 2>/dev/null || echo 'unknown'))"
+  else
+    warn "pip install 失败，请手动执行: $PIP install -e $REPO_DIR"
+  fi
+else
+  warn "未找到 git 仓库: $REPO_DIR — 跳过代码更新"
+  warn "请先 git clone 仓库，或手动安装: pip install -e /path/to/reach-agent"
+fi
+
+echo ""
 
 # --------------------------------------------------
 # 1. 安装 agent-reach skill（Claude Code + OpenClaw）
@@ -539,32 +583,17 @@ mkdir -p "$HOME/Desktop/我的知识库/用户调研"
 log "报告目录 → ~/Desktop/我的知识库/用户调研/"
 
 # --------------------------------------------------
-# 4. 更新 agent-reach 代码仓库（拉取最新）
-# --------------------------------------------------
-REPO_DIR="$HOME/Desktop/MyAgent/reach-agent"
-if [ -d "$REPO_DIR/.git" ]; then
-  git -C "$REPO_DIR" fetch --all 2>/dev/null
-  CURRENT=$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null)
-  if [ "$CURRENT" = "refactor-v1.1" ]; then
-    git -C "$REPO_DIR" pull --rebase 2>/dev/null && log "reach-agent 代码已更新 (refactor-v1.1)"
-  else
-    warn "reach-agent 当前分支: $CURRENT (非 refactor-v1.1)，跳过自动 pull"
-  fi
-else
-  warn "reach-agent 仓库不存在于 $REPO_DIR，跳过代码更新"
-fi
-
-# --------------------------------------------------
-# 5. 完成
+# 4. 完成
 # --------------------------------------------------
 echo ""
 echo "========================================="
 echo "  迁移完成！已覆盖安装:"
-echo "  - agent-reach skill (含 XHS/图片下载)"
-echo "  - user-research-report skill (文件夹格式)"
-echo "  - 用户调研报告目录"
+echo "  [0] agent-reach 代码 + Python 包"
+echo "  [1] agent-reach skill (含 XHS/图片下载)"
+echo "  [2] user-research-report skill (文件夹格式)"
+echo "  [3] 用户调研报告目录"
 echo "========================================="
 echo ""
-echo "验证: 在 Claude Code / CLAW 中输入"
-echo "  「帮我通过小红书分析 XX」"
-echo "  看是否自动触发 agent-reach → 数据采集 → 报告生成 流程"
+echo "验证:"
+echo "  agent-reach doctor"
+echo "  agent-reach version"
